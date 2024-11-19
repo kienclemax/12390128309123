@@ -7,7 +7,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Get the current SSH port from sshd_config
-CURRENT_SSH_PORT=$(grep "^Port " /etc/ssh/sshd_config | awk '{print $2}')
+CURRENT_SSH_PORT=$(netstat -tulpn | grep sshd | awk '{print $4}' | awk -F: '{print $NF}')
 
 # Check if the current SSH port is 22
 if [[ "$CURRENT_SSH_PORT" != "22" ]]; then
