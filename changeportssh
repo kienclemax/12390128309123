@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Check if the script is running with root privileges
+if [[ $EUID -ne 0 ]]; then
+  echo "This script requires root privileges. Please use sudo."
+  exit 1
+fi
+
+# Get the current SSH port from sshd_config
+CURRENT_SSH_PORT=$(grep "^Port " /etc/ssh/sshd_config | awk '{print $2}')
+
+# Check if the current SSH port is 22
+if [[ "$CURRENT_SSH_PORT" != "22" ]]; then
+  echo "The current SSH port is not 22. This script is designed to change the default port (22)."
+  echo "Exiting to avoid unexpected issues."
+  exit 1
+fi
+
+# Define the new SSH port
+NEW_SSH_PORT=2222
+
+# Function to create a timestamped backup
+create_backup() {
+  local file="$1"
+  local backup_file="${file}.bak_$(date +%Y%m%d%H%M%S)"
+  cp "$file" "$backup_file" || {
+    echo "Failed to create backup ($backup_file). Exiting."
+    exit 1
+  }
+  echo "Backup of $file saved to $backup_file"
+}
+
+# Create a backup of the sshd_config file
+create_backup "/etc/ssh/sshd_config"
+
+# Update the Port setting in the sshd_config file
+sed -i "s/^#Port [0-9]\+/Port $NEW_SSH_PORT/" /etc/ssh/sshd_config || {
+  echo "Failed to update SSH port in /etc/ssh/sshd_config. Exiting."
+  exit 1
+}
+
+# Restart the SSH service to apply the changes
+systemctl restart sshd || {
+  echo "Failed to restart SSH service. Exiting."
+  exit 1
+}
+
+# Allow the new SSH port through the firewall (using firewalld as an example)
+sudo firewall-cmd --permanent --add-port=$NEW_SSH_PORT/tcp
+sudo firewall-cmd --reload
+
+echo "SSH port successfully changed to $NEW_SSH_PORT."
